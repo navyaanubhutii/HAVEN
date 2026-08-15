@@ -1,0 +1,105 @@
+import React from 'react';
+import { InsightsData, ScreenType } from '../types';
+import { IndianRupee, Leaf, HeartPulse, TrendingDown, ShieldAlert, Award, ArrowUpRight } from 'lucide-react';
+
+interface InsightsScreenProps {
+  insights: InsightsData;
+  onNavigate: (screen: ScreenType) => void;
+}
+
+export const InsightsScreen: React.FC<InsightsScreenProps> = ({ insights, onNavigate }) => {
+  return (
+    <div className="space-y-5 pb-24 animate-fade-in max-w-md mx-auto">
+      <div>
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+          <span>📊 Household Insights</span>
+        </h1>
+        <p className="text-xs text-slate-500">Financial savings & food waste impact analysis</p>
+      </div>
+
+      {/* Main Financial Savings Hero Card */}
+      <div className="p-6 rounded-3xl bg-gradient-to-br from-haven-700 to-haven-900 text-white shadow-lg space-y-4">
+        <div className="flex items-center justify-between text-haven-200 text-xs font-bold uppercase tracking-wider">
+          <span>Estimated Food Saved</span>
+          <Award className="w-5 h-5 text-amber-400" />
+        </div>
+
+        <div className="flex items-baseline gap-1">
+          <span className="text-4xl font-extrabold tracking-tight">
+            {insights.currencySymbol}{insights.totalFoodSaved}
+          </span>
+          <span className="text-xs text-haven-200 font-medium">rescued value</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-haven-600/60 text-xs">
+          <div>
+            <div className="text-haven-300">Items Rescued</div>
+            <div className="text-lg font-bold text-white mt-0.5">{insights.itemsRescuedCount} items</div>
+          </div>
+          <div>
+            <div className="text-haven-300">Waste Trend</div>
+            <div className="text-lg font-bold text-amber-300 mt-0.5 flex items-center gap-1">
+              <TrendingDown className="w-4 h-4" />
+              <span>↓ {insights.wasteReductionPercentage}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid of Key Analytics Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Pantry Health Score */}
+        <div className="glass-panel p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <HeartPulse className="w-5 h-5 text-haven-600" />
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-haven-100 text-haven-700">Health</span>
+          </div>
+          <div>
+            <div className="text-2xl font-extrabold text-slate-900 dark:text-white">
+              {insights.pantryHealthScore}%
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-0.5">Pantry Health</div>
+          </div>
+        </div>
+
+        {/* Most Wasted Item */}
+        <div className="glass-panel p-4 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <ShieldAlert className="w-5 h-5 text-amber-500" />
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Risk</span>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-slate-900 dark:text-white truncate">
+              {insights.mostFrequentlyWasted}
+            </div>
+            <div className="text-xs text-slate-500 font-medium mt-0.5">Most Wasted</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Environmental Impact Estimation Card */}
+      <div className="glass-panel p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 space-y-3">
+        <div className="flex items-center gap-2">
+          <Leaf className="w-5 h-5 text-haven-600" />
+          <h3 className="font-bold text-base text-slate-900 dark:text-white">Environmental Footprint Saved</h3>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
+          <div className="p-3 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+            <div className="text-slate-500">CO₂e Avoided</div>
+            <div className="text-base font-extrabold text-haven-700 dark:text-haven-300 mt-1">
+              ~{insights.co2AvoidedKg} kg
+            </div>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-white/60 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800">
+            <div className="text-slate-500">Water Rescued</div>
+            <div className="text-base font-extrabold text-haven-700 dark:text-haven-300 mt-1">
+              ~{insights.waterSavedLiters} L
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

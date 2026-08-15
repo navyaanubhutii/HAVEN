@@ -1,11 +1,12 @@
 import React from 'react';
 import { InventoryItem, Recipe, ScreenType } from '../types';
-import { Camera, PlusCircle, Package, ShoppingBag, AlertTriangle, Sparkles, CheckCircle, ArrowRight, HeartPulse } from 'lucide-react';
+import { Camera, PlusCircle, Package, ShoppingBag, AlertTriangle, Sparkles, CheckCircle, ArrowRight, HeartPulse, Wifi, WifiOff } from 'lucide-react';
 import { computePantryHealthScore } from '../services/store';
 
 interface HomeScreenProps {
   inventory: InventoryItem[];
   suggestedRecipe?: Recipe;
+  isBackendOnline?: boolean;
   onNavigate: (screen: ScreenType) => void;
   onSelectRecipe: (recipe: Recipe) => void;
 }
@@ -13,12 +14,13 @@ interface HomeScreenProps {
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   inventory,
   suggestedRecipe,
+  isBackendOnline = true,
   onNavigate,
   onSelectRecipe
 }) => {
   const pantryHealth = computePantryHealthScore(inventory);
 
-  // Extract priorities
+  // Extract actual priorities
   const expiringToday = inventory.filter((i) => i.status === 'expiring_today');
   const useSoon = inventory.filter((i) => i.status === 'use_soon');
   const expired = inventory.filter((i) => i.status === 'expired');
@@ -33,14 +35,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-24 animate-fade-in">
+    <div className="space-y-6 pb-24 animate-fade-in max-w-md mx-auto">
       {/* Top Greeting & Pantry Health */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-            <span>{getTimeGreeting()}</span>
-            <span className="text-xl">🌿</span>
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <span>{getTimeGreeting()}</span>
+              <span className="text-xl">🌿</span>
+            </h1>
+          </div>
           <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
             Here is what needs your attention in your home today.
           </p>
@@ -61,6 +65,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
+      {/* Backend Status Notification */}
+      {!isBackendOnline && (
+        <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <WifiOff className="w-4 h-4 text-amber-600" />
+            <span>FastAPI Server Offline — Running on Local Storage fallback mode</span>
+          </div>
+        </div>
+      )}
+
       {/* TODAY'S PRIORITIES SECTION */}
       <div className="glass-panel p-5 rounded-3xl space-y-3.5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
         <div className="flex items-center justify-between">
@@ -72,14 +86,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onClick={() => onNavigate('pantry')}
             className="text-xs font-semibold text-haven-600 dark:text-haven-400 flex items-center gap-1 hover:underline"
           >
-            <span>View all</span>
+            <span>View all ({inventory.length})</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {priorities.length === 0 ? (
-          <div className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">
-            🟢 Everything in your pantry is fresh! No urgent expiries.
+          <div className="py-5 text-center text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40">
+            🟢 All items in your pantry are fresh! No urgent expiries.
           </div>
         ) : (
           <div className="space-y-2">
@@ -139,7 +153,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <div className="relative z-10 space-y-3">
             <div className="flex items-center gap-2 text-amber-300 text-xs font-bold tracking-wider uppercase">
               <Sparkles className="w-4 h-4" />
-              <span>Haven Suggests</span>
+              <span>Haven Recipe Suggestion</span>
             </div>
 
             <div>
@@ -152,7 +166,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
 
             <div className="pt-2 border-t border-haven-600/60">
-              <div className="text-[11px] font-semibold text-haven-200 mb-1.5">You already have:</div>
+              <div className="text-[11px] font-semibold text-haven-200 mb-1.5">You have matching items:</div>
               <div className="flex flex-wrap gap-2">
                 {suggestedRecipe.usedIngredients.slice(0, 4).map((ing, idx) => (
                   <span
@@ -173,7 +187,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               className="w-full mt-3 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow-md flex items-center justify-center gap-2 transition-all"
             >
-              <span>Cook This Tonight</span>
+              <span>Cook This Recipe</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -195,7 +209,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
             <div>
               <div className="font-bold text-sm text-slate-900 dark:text-white">Scan Receipt</div>
-              <div className="text-[11px] text-slate-500">Auto-add items</div>
+              <div className="text-[11px] text-slate-500">Auto-extract items</div>
             </div>
           </button>
 

@@ -9,8 +9,21 @@ export interface InventoryItem {
   purchaseDate: string;
   expiryDate: string;
   storageLocation: 'Fridge' | 'Freezer' | 'Pantry' | 'Cabinet';
+  price?: number; // Optional explicit purchase price
   status: ExpiryStatus;
   daysRemaining: number;
+  isEstimatedExpiry?: boolean; // True if Haven estimated date; False if user provided
+}
+
+export interface WasteHistoryItem {
+  id: string;
+  itemName: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  price?: number;
+  actionType: 'used_before_expiry' | 'wasted';
+  loggedAt: string;
 }
 
 export interface ExtractedScanItem {

@@ -9,6 +9,7 @@ interface HeaderProps {
   darkMode: boolean;
   onToggleDarkMode: () => void;
   shoppingCount?: number;
+  isBackendOnline?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,7 +17,8 @@ export const Header: React.FC<HeaderProps> = ({
   onNavigate,
   darkMode,
   onToggleDarkMode,
-  shoppingCount = 0
+  shoppingCount = 0,
+  isBackendOnline = true
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-linen/90 dark:bg-charcoal/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 py-3">
@@ -27,6 +29,11 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-lg leading-none tracking-tight text-haven-900 dark:text-haven-100">Haven</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-haven-100 dark:bg-haven-900/60 text-haven-700 dark:text-haven-300 font-medium">AI</span>
+              {!isBackendOnline && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-semibold" title="FastAPI server offline — Running in Local Storage Mode">
+                  Local Mode
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{householdName}</p>
           </div>

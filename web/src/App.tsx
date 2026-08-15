@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { ScreenType, InventoryItem, ExtractedScanItem, Recipe, ShoppingItem, InsightsData, HouseholdProfile } from './types';
+import { ScreenType, InventoryItem, ExtractedScanItem, Recipe, ShoppingItem, InsightsData, HouseholdProfile, WasteHistoryItem } from './types';
 import { computeDaysAndStatus, computePantryHealthScore } from './services/store';
+import { api } from './services/api';
 
 // Import Screens
 import { SplashScreen } from './screens/SplashScreen';
@@ -24,114 +25,135 @@ export function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('splash');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [isBackendOnline, setIsBackendOnline] = useState(true);
 
-  // Core State
+  // Check backend health on startup
+  useEffect(() => {
+    api.healthCheck().then((res) => {
+      setIsBackendOnline(res.isOnline);
+    });
+  }, []);
+
+  // Single Source of Truth Normalized State (LocalStorage persisted)
   const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    const saved = localStorage.getItem('haven_inventory');
+    const saved = localStorage.getItem('haven_inventory_v1');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) {}
     }
+    const today = new Date().toISOString().split('T')[0];
     return [
       {
-        id: 'item-1',
+        id: 'item-101',
         name: 'Fresh Baby Spinach',
         category: 'Vegetables',
         quantity: 1,
         unit: 'pack',
-        purchaseDate: new Date().toISOString().split('T')[0],
-        expiryDate: new Date().toISOString().split('T')[0], // Expires today!
+        purchaseDate: today,
+        expiryDate: today, // Expires today!
         storageLocation: 'Fridge',
+        price: 40,
         status: 'expiring_today',
         daysRemaining: 0,
+        isEstimatedExpiry: false
       },
       {
-        id: 'item-2',
+        id: 'item-102',
         name: 'Amul T-Special Milk',
         category: 'Dairy',
         quantity: 2,
         unit: 'L',
-        purchaseDate: new Date().toISOString().split('T')[0],
+        purchaseDate: today,
         expiryDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
         storageLocation: 'Fridge',
+        price: 66,
         status: 'use_soon',
         daysRemaining: 1,
+        isEstimatedExpiry: false
       },
       {
-        id: 'item-3',
+        id: 'item-103',
         name: 'Whole Wheat Bread',
         category: 'Bakery',
         quantity: 1,
         unit: 'pack',
-        purchaseDate: new Date().toISOString().split('T')[0],
-        expiryDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], // 3 days
+        purchaseDate: today,
+        expiryDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
         storageLocation: 'Pantry',
+        price: 45,
         status: 'use_soon',
         daysRemaining: 3,
+        isEstimatedExpiry: true
       },
       {
-        id: 'item-4',
+        id: 'item-104',
         name: 'Fresh Hybrid Tomatoes',
         category: 'Vegetables',
         quantity: 1,
         unit: 'kg',
-        purchaseDate: new Date().toISOString().split('T')[0],
+        purchaseDate: today,
         expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
         storageLocation: 'Pantry',
+        price: 50,
         status: 'fresh',
         daysRemaining: 5,
+        isEstimatedExpiry: true
       },
       {
-        id: 'item-5',
+        id: 'item-105',
         name: 'Garlic Cloves',
         category: 'Vegetables',
         quantity: 200,
         unit: 'g',
-        purchaseDate: new Date().toISOString().split('T')[0],
+        purchaseDate: today,
         expiryDate: new Date(Date.now() + 86400000 * 14).toISOString().split('T')[0],
         storageLocation: 'Pantry',
         status: 'fresh',
         daysRemaining: 14,
+        isEstimatedExpiry: true
       },
       {
-        id: 'item-6',
+        id: 'item-106',
         name: 'Spaghetti Pasta',
         category: 'Grains',
         quantity: 500,
         unit: 'g',
-        purchaseDate: new Date().toISOString().split('T')[0],
+        purchaseDate: today,
         expiryDate: new Date(Date.now() + 86400000 * 120).toISOString().split('T')[0],
         storageLocation: 'Cabinet',
+        price: 80,
         status: 'fresh',
         daysRemaining: 120,
+        isEstimatedExpiry: true
       }
     ];
   });
 
-  const [pendingScanItems, setPendingScanItems] = useState<ExtractedScanItem[]>([]);
+  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>(() => {
+    const saved = localStorage.getItem('haven_shopping_v1');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [
+      { id: 'shop-1', name: 'Olive Oil 500ml', category: 'Oils', quantity: 1, unit: 'bottle', isAiSuggested: false, isCompleted: false },
+      { id: 'shop-2', name: 'Amul Milk 1L', category: 'Dairy', quantity: 2, unit: 'L', isAiSuggested: true, reason: 'You finish milk every 5 days. Running low soon.', isCompleted: false }
+    ];
+  });
 
-  const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([
-    { id: 'shop-1', name: 'Olive Oil 500ml', category: 'Oils', quantity: 1, unit: 'bottle', isAiSuggested: false, isCompleted: false },
-    { id: 'shop-2', name: 'Amul Milk 1L', category: 'Dairy', quantity: 2, unit: 'L', isAiSuggested: true, reason: 'You finish milk every 5 days. Running low soon.', isCompleted: false },
-    { id: 'shop-3', name: 'Greek Yogurt', category: 'Dairy', quantity: 2, unit: 'cups', isAiSuggested: true, reason: 'High consumption history', isCompleted: false }
-  ]);
+  const [wasteHistory, setWasteHistory] = useState<WasteHistoryItem[]>(() => {
+    const saved = localStorage.getItem('haven_waste_v1');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
+  });
+
+  const [pendingScanItems, setPendingScanItems] = useState<ExtractedScanItem[]>([]);
 
   const [profile, setProfile] = useState<HouseholdProfile>({
     name: 'Green Nest Household',
     language: 'en',
     dietaryPrefs: ['Vegetarian'],
     membersCount: 3
-  });
-
-  const [insights, setInsights] = useState<InsightsData>({
-    currencySymbol: '₹',
-    totalFoodSaved: 540,
-    itemsRescuedCount: 12,
-    itemsWastedCount: 3,
-    mostFrequentlyWasted: '🥬 Spinach',
-    wasteReductionPercentage: 24,
-    pantryHealthScore: 92,
-    co2AvoidedKg: 4.8,
-    waterSavedLiters: 180
   });
 
   // Default Recipes
@@ -145,8 +167,8 @@ export function App() {
       primaryTargetIngredient: 'Spinach',
       usedIngredients: [
         { name: 'Fresh Baby Spinach', quantity: '1 pack', status: 'expiring_today' },
-        { name: 'Amul T-Special Milk', quantity: '250 ml', status: 'use_soon' },
-        { name: 'Garlic Cloves', quantity: '4 cloves', status: 'fresh' },
+        { name: 'Amul T-Special Milk', quantity: '0.25 L', status: 'use_soon' },
+        { name: 'Garlic Cloves', quantity: '20 g', status: 'fresh' },
         { name: 'Spaghetti Pasta', quantity: '200 g', status: 'fresh' }
       ],
       missingIngredients: [{ name: 'Olive Oil', quantity: '1 tbsp' }],
@@ -167,9 +189,9 @@ export function App() {
       dietaryType: 'Vegan',
       primaryTargetIngredient: 'Tomatoes',
       usedIngredients: [
-        { name: 'Fresh Hybrid Tomatoes', quantity: '500 g', status: 'use_soon' },
-        { name: 'Garlic Cloves', quantity: '6 cloves', status: 'fresh' },
-        { name: 'Whole Wheat Bread', quantity: '2 slices', status: 'use_soon' }
+        { name: 'Fresh Hybrid Tomatoes', quantity: '0.5 kg', status: 'use_soon' },
+        { name: 'Garlic Cloves', quantity: '30 g', status: 'fresh' },
+        { name: 'Whole Wheat Bread', quantity: '1 pack', status: 'use_soon' }
       ],
       missingIngredients: [{ name: 'Vegetable Broth', quantity: '1 cup' }],
       instructions: [
@@ -184,12 +206,18 @@ export function App() {
 
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe>(defaultRecipes[0]);
 
-  // Persist inventory
+  // Persist State to LocalStorage
   useEffect(() => {
-    localStorage.setItem('haven_inventory', JSON.stringify(inventory));
-    const health = computePantryHealthScore(inventory);
-    setInsights((prev) => ({ ...prev, pantryHealthScore: health }));
+    localStorage.setItem('haven_inventory_v1', JSON.stringify(inventory));
   }, [inventory]);
+
+  useEffect(() => {
+    localStorage.setItem('haven_shopping_v1', JSON.stringify(shoppingList));
+  }, [shoppingList]);
+
+  useEffect(() => {
+    localStorage.setItem('haven_waste_v1', JSON.stringify(wasteHistory));
+  }, [wasteHistory]);
 
   // Dark mode toggle
   useEffect(() => {
@@ -200,7 +228,7 @@ export function App() {
     }
   }, [darkMode]);
 
-  // Actions
+  // Inventory Action Handlers
   const handleAddItem = (newItemData: Omit<InventoryItem, 'id' | 'status' | 'daysRemaining'>) => {
     const { daysRemaining, status } = computeDaysAndStatus(newItemData.expiryDate);
     const newItem: InventoryItem = {
@@ -216,11 +244,17 @@ export function App() {
     const item = inventory.find((i) => i.id === id);
     if (item) {
       setInventory(inventory.filter((i) => i.id !== id));
-      setInsights((prev) => ({
-        ...prev,
-        totalFoodSaved: prev.totalFoodSaved + 45,
-        itemsRescuedCount: prev.itemsRescuedCount + 1
-      }));
+      const logEntry: WasteHistoryItem = {
+        id: `waste-${Date.now()}`,
+        itemName: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        unit: item.unit,
+        price: item.price,
+        actionType: 'used_before_expiry',
+        loggedAt: new Date().toISOString()
+      };
+      setWasteHistory([logEntry, ...wasteHistory]);
     }
   };
 
@@ -228,11 +262,17 @@ export function App() {
     const item = inventory.find((i) => i.id === id);
     if (item) {
       setInventory(inventory.filter((i) => i.id !== id));
-      setInsights((prev) => ({
-        ...prev,
-        itemsWastedCount: prev.itemsWastedCount + 1,
-        mostFrequentlyWasted: `🥬 ${item.name}`
-      }));
+      const logEntry: WasteHistoryItem = {
+        id: `waste-${Date.now()}`,
+        itemName: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        unit: item.unit,
+        price: item.price,
+        actionType: 'wasted',
+        loggedAt: new Date().toISOString()
+      };
+      setWasteHistory([logEntry, ...wasteHistory]);
     }
   };
 
@@ -253,24 +293,65 @@ export function App() {
         expiryDate: sc.expiryDate,
         storageLocation: sc.storageLocation,
         status,
-        daysRemaining
+        daysRemaining,
+        isEstimatedExpiry: true
       };
     });
     setInventory([...newItems, ...inventory]);
   };
 
+  /**
+   * PRECISE RECIPE "COOK & AUTO-DEDUCT":
+   * Deducts ONLY the required quantity from matching items.
+   * Items are never deleted unless remaining quantity drops <= 0.
+   */
   const handleCookRecipe = (recipe: Recipe) => {
-    // Automatically deduct used ingredients from inventory
-    const usedNames = recipe.usedIngredients.map((u) => u.name.toLowerCase());
-    const updatedInventory = inventory.filter(
-      (item) => !usedNames.some((uName) => item.name.toLowerCase().includes(uName) || uName.includes(item.name.toLowerCase()))
-    );
+    let updatedInventory = [...inventory];
+    const loggedEntries: WasteHistoryItem[] = [];
+
+    recipe.usedIngredients.forEach((reqIng) => {
+      const targetName = reqIng.name.toLowerCase();
+      // Find matching item in inventory
+      const matchIndex = updatedInventory.findIndex(
+        (inv) => inv.name.toLowerCase().includes(targetName) || targetName.includes(inv.name.toLowerCase())
+      );
+
+      if (matchIndex !== -1) {
+        const invItem = updatedInventory[matchIndex];
+        // Parse required numeric quantity from string like "0.25 L" or "20 g" or "1 pack"
+        const numMatch = reqIng.quantity.match(/([\d\.]+)/);
+        const reqQty = numMatch ? parseFloat(numMatch[1]) : 1.0;
+
+        // Perform safe partial deduction
+        const newQty = invItem.quantity - reqQty;
+
+        if (newQty <= 0) {
+          // Quantity completely consumed -> remove item from inventory
+          updatedInventory.splice(matchIndex, 1);
+        } else {
+          // Update remaining quantity
+          updatedInventory[matchIndex] = {
+            ...invItem,
+            quantity: Math.round(newQty * 100) / 100
+          };
+        }
+
+        loggedEntries.push({
+          id: `waste-cook-${Date.now()}-${Math.random()}`,
+          itemName: invItem.name,
+          category: invItem.category,
+          quantity: reqQty,
+          unit: invItem.unit,
+          price: invItem.price ? (invItem.price * (reqQty / invItem.quantity)) : undefined,
+          actionType: 'used_before_expiry',
+          loggedAt: new Date().toISOString()
+        });
+      }
+    });
+
     setInventory(updatedInventory);
-    setInsights((prev) => ({
-      ...prev,
-      totalFoodSaved: prev.totalFoodSaved + 80,
-      itemsRescuedCount: prev.itemsRescuedCount + recipe.usedIngredients.length
-    }));
+    setWasteHistory([...loggedEntries, ...wasteHistory]);
+    alert(`🎉 Recipe ingredients auto-deducted! Your inventory quantities have been updated.`);
   };
 
   const handleAddShoppingItem = (itemData: Omit<ShoppingItem, 'id' | 'isCompleted'>) => {
@@ -299,8 +380,51 @@ export function App() {
       unit: item.unit,
       purchaseDate: new Date().toISOString().split('T')[0],
       expiryDate: calcDate.toISOString().split('T')[0],
-      storageLocation: 'Pantry'
+      storageLocation: 'Pantry',
+      isEstimatedExpiry: true
     });
+  };
+
+  // Compute insights dynamically from actual wasteHistory
+  const computeDynamicInsights = (): InsightsData & { hasData: boolean; hasExplicitPrice: boolean } => {
+    const rescued = wasteHistory.filter((w) => w.actionType === 'used_before_expiry');
+    const wasted = wasteHistory.filter((w) => w.actionType === 'wasted');
+
+    let totalSaved = 0;
+    let hasPrice = false;
+    rescued.forEach((r) => {
+      if (r.price && r.price > 0) {
+        totalSaved += r.price;
+        hasPrice = true;
+      }
+    });
+
+    const wasteCounts: Record<string, number> = {};
+    wasted.forEach((w) => {
+      wasteCounts[w.itemName] = (wasteCounts[w.itemName] || 0) + 1;
+    });
+
+    const topWasted = Object.keys(wasteCounts).length > 0
+      ? Object.entries(wasteCounts).sort((a, b) => b[1] - a[1])[0][0]
+      : 'None';
+
+    const healthScore = computePantryHealthScore(inventory);
+    const totalLogged = rescued.length + wasted.length;
+    const reductionPct = totalLogged > 0 ? Math.round((rescued.length / totalLogged) * 100) : 0;
+
+    return {
+      currencySymbol: '₹',
+      totalFoodSaved: totalSaved,
+      itemsRescuedCount: rescued.length,
+      itemsWastedCount: wasted.length,
+      mostFrequentlyWasted: topWasted,
+      wasteReductionPercentage: reductionPct,
+      pantryHealthScore: healthScore,
+      co2AvoidedKg: Math.round(rescued.length * 0.4 * 10) / 10,
+      waterSavedLiters: rescued.length * 15,
+      hasData: totalLogged > 0,
+      hasExplicitPrice: hasPrice
+    };
   };
 
   // Screen View Dispatcher
@@ -313,7 +437,7 @@ export function App() {
       case 'auth':
         return (
           <AuthScreen
-            onLogin={(isGuest) => {
+            onLogin={() => {
               setIsAuthenticated(true);
               setCurrentScreen('home');
             }}
@@ -324,6 +448,7 @@ export function App() {
           <HomeScreen
             inventory={inventory}
             suggestedRecipe={selectedRecipe}
+            isBackendOnline={isBackendOnline}
             onNavigate={setCurrentScreen}
             onSelectRecipe={setSelectedRecipe}
           />
@@ -375,7 +500,7 @@ export function App() {
           />
         );
       case 'insights':
-        return <InsightsScreen insights={insights} onNavigate={setCurrentScreen} />;
+        return <InsightsScreen insights={computeDynamicInsights()} onNavigate={setCurrentScreen} />;
       case 'profile':
         return (
           <ProfileScreen
@@ -393,6 +518,7 @@ export function App() {
           <HomeScreen
             inventory={inventory}
             suggestedRecipe={selectedRecipe}
+            isBackendOnline={isBackendOnline}
             onNavigate={setCurrentScreen}
             onSelectRecipe={setSelectedRecipe}
           />
@@ -411,6 +537,7 @@ export function App() {
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode(!darkMode)}
           shoppingCount={shoppingList.filter((s) => !s.isCompleted).length}
+          isBackendOnline={isBackendOnline}
         />
       )}
 

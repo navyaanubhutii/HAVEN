@@ -1,54 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { InventoryItem, ScreenType } from '../types';
-import { ArrowLeft, Sparkles, Check, Calendar } from 'lucide-react';
-import { computeDaysAndStatus } from '../services/store';
+import { ArrowLeft, Sparkles, Check, Info } from 'lucide-react';
+import { api } from '../services/api';
 
 interface AddItemScreenProps {
   onNavigate: (screen: ScreenType) => void;
   onAddItem: (item: Omit<InventoryItem, 'id' | 'status' | 'daysRemaining'>) => void;
 }
 
-const CATEGORY_DEFAULT_DAYS: Record<string, number> = {
-  Dairy: 5,
-  Vegetables: 4,
-  Fruits: 6,
-  Grains: 90,
-  Snacks: 45,
-  Beverages: 14,
-  Bakery: 4,
-  Household: 180,
-  Other: 7
-};
-
 export const AddItemScreen: React.FC<AddItemScreenProps> = ({ onNavigate, onAddItem }) => {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<InventoryItem['category']>('Vegetables');
   const [quantity, setQuantity] = useState<number>(1);
   const [unit, setUnit] = useState<string>('pcs');
+  const [price, setPrice] = useState<string>('');
   const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [expiryDate, setExpiryDate] = useState<string>('');
   const [storageLocation, setStorageLocation] = useState<InventoryItem['storageLocation']>('Fridge');
+  const [isEstimated, setIsEstimated] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
-  // Auto calculate estimated expiry when category changes
+  // Call API for estimated shelf life when category or name changes
   useEffect(() => {
-    const days = CATEGORY_DEFAULT_DAYS[category] || 7;
-    const calcDate = new Date();
-    calcDate.setDate(calcDate.getDate() + days);
-    setExpiryDate(calcDate.toISOString().split('T')[0]);
-  }, [category]);
+    let isSubscribed = true;
+    api.estimateExpiryDays(name, category).then((days) => {
+      if (isSubscribed && isEstimated) {
+        const calcDate = new Date();
+        calcDate.setDate(calcDate.getDate() + days);
+        setExpiryDate(calcDate.toISOString().split('T')[0]);
+      }
+    });
+    return () => { isSubscribed = false; };
+  }, [category, name, isEstimated]);
+
+  const handleExpiryChange = (val: string) => {
+    setExpiryDate(val);
+    setIsEstimated(false); // User explicitly selected this date!
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    setErrorMsg('');
+
+    if (!name.trim()) {
+      setErrorMsg('Product name is required.');
+      return;
+    }
+
+    if (quantity <= 0) {
+      setErrorMsg('Quantity must be greater than zero.');
+      return;
+    }
+
+    if (!expiryDate) {
+      setErrorMsg('Expiry date is required.');
+      return;
+    }
 
     onAddItem({
       name: name.trim(),
       category,
       quantity,
       unit,
+      price: price ? parseFloat(price) : undefined,
       purchaseDate,
-      expiryDate: expiryDate || new Date().toISOString().split('T')[0],
-      storageLocation
+      expiryDate,
+      storageLocation,
+      isEstimatedExpiry: isEstimated
     });
 
     onNavigate('pantry');
@@ -66,9 +84,15 @@ export const AddItemScreen: React.FC<AddItemScreenProps> = ({ onNavigate, onAddI
         </button>
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">➕ Add Item to Haven</h1>
-          <p className="text-xs text-slate-500">Fast manual inventory addition</p>
+          <p className="text-xs text-slate-500">Manual inventory addition</p>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="p-3 rounded-2xl bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800 text-xs font-semibold text-red-700 dark:text-red-300">
+          ⚠️ {errorMsg}
+        </div>
+      )}
 
       {/* Form Card */}
       <form onSubmit={handleSubmit} className="glass-panel p-5 rounded-3xl space-y-4 border border-slate-200/80 dark:border-slate-800">
@@ -89,14 +113,16 @@ export const AddItemScreen: React.FC<AddItemScreenProps> = ({ onNavigate, onAddI
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-              Quantity
+              Quantity *
             </label>
             <input
               type="number"
               step="0.1"
+              min="0.1"
               value={quantity}
               onChange={(e) => setQuantity(parseFloat(e.target.value) || 1)}
               className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-haven-600 text-sm"
+              required
             />
           </div>
 
@@ -159,6 +185,20 @@ export const AddItemScreen: React.FC<AddItemScreenProps> = ({ onNavigate, onAddI
           </div>
         </div>
 
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+            Purchase Price (Optional ₹)
+          </label>
+          <input
+            type="number"
+            step="1"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="e.g. 60 (Leave empty if unpriced)"
+            className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-haven-600 text-sm"
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
@@ -179,7 +219,7 @@ export const AddItemScreen: React.FC<AddItemScreenProps> = ({ onNavigate, onAddI
             <input
               type="date"
               value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
+              onChange={(e) => handleExpiryChange(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-haven-600 text-sm"
               required
             />
@@ -187,10 +227,14 @@ export const AddItemScreen: React.FC<AddItemScreenProps> = ({ onNavigate, onAddI
         </div>
 
         {/* AI Rule Suggestion Banner */}
-        <div className="p-3 rounded-xl bg-haven-50 dark:bg-haven-950/40 border border-haven-200 dark:border-haven-800/40 flex items-start gap-2.5">
-          <Sparkles className="w-4 h-4 text-haven-600 dark:text-haven-400 mt-0.5" />
+        <div className="p-3.5 rounded-2xl bg-haven-50 dark:bg-haven-950/40 border border-haven-200 dark:border-haven-800/40 flex items-start gap-2.5">
+          <Sparkles className="w-4 h-4 text-haven-600 dark:text-haven-400 mt-0.5 shrink-0" />
           <div className="text-xs text-haven-800 dark:text-haven-200">
-            <span className="font-bold">Haven Rule:</span> Standard shelf life for {category} is estimated at ~{CATEGORY_DEFAULT_DAYS[category]} days. Expiry date has been auto-calculated.
+            {isEstimated ? (
+              <span><span className="font-bold">Haven Shelf-Life Estimate:</span> Expiry date auto-estimated based on standard {category} shelf life. You can edit the date to set an explicit expiration.</span>
+            ) : (
+              <span><span className="font-bold">User-Specified Expiry Date:</span> Saved as explicit date provided by user.</span>
+            )}
           </div>
         </div>
 

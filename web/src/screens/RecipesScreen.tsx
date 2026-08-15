@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Recipe, InventoryItem, ScreenType } from '../types';
-import { Sparkles, Clock, CheckCircle, Flame, ChefHat, ArrowRight, Utensils, X } from 'lucide-react';
+import { Sparkles, Clock, CheckCircle, ChefHat, ArrowRight, Utensils, X, Info } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface RecipesScreenProps {
@@ -36,7 +36,6 @@ export const RecipesScreen: React.FC<RecipesScreenProps> = ({
     });
     onCookRecipe(recipe);
     setSelectedRecipe(null);
-    alert(`🎉 Bon Appétit! Ingredients used for "${recipe.title}" have been automatically deducted from your Haven Pantry.`);
   };
 
   return (
@@ -45,7 +44,13 @@ export const RecipesScreen: React.FC<RecipesScreenProps> = ({
         <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
           <span>🍳 Haven AI Recipes</span>
         </h1>
-        <p className="text-xs text-slate-500">Meal suggestions dynamically generated from your expiring inventory</p>
+        <p className="text-xs text-slate-500">Meal suggestions matching your expiring inventory</p>
+      </div>
+
+      {/* Honest Engine Badge */}
+      <div className="p-3 rounded-2xl bg-haven-50 dark:bg-haven-950/40 border border-haven-200 dark:border-haven-800 text-xs text-haven-900 dark:text-haven-100 flex items-center gap-2">
+        <Info className="w-4 h-4 text-haven-600 shrink-0" />
+        <span><span className="font-bold">Rule-Based Recipe Match Engine:</span> Analyzes actual inventory items near expiration without external AI keys.</span>
       </div>
 
       {/* Filter Chips */}
@@ -98,7 +103,7 @@ export const RecipesScreen: React.FC<RecipesScreenProps> = ({
                 </div>
                 <div className="text-right shrink-0 ml-3">
                   <span className="px-2 py-1 rounded-lg bg-haven-100 dark:bg-haven-900 text-haven-700 dark:text-haven-300 text-xs font-extrabold">
-                    {recipe.wasteReductionScore}% Rescue
+                    {recipe.wasteReductionScore}% Match
                   </span>
                 </div>
               </div>
@@ -184,7 +189,7 @@ export const RecipesScreen: React.FC<RecipesScreenProps> = ({
               className="w-full py-4 rounded-2xl bg-haven-600 hover:bg-haven-700 text-white font-bold text-sm shadow-lg shadow-haven-600/25 flex items-center justify-center gap-2 transition-all"
             >
               <Utensils className="w-5 h-5" />
-              <span>Cook & Auto-Deduct Pantry Ingredients</span>
+              <span>Cook & Auto-Deduct Required Quantity</span>
             </button>
           </div>
         </div>

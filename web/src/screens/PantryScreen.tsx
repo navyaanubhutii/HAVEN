@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { InventoryItem, ScreenType } from '../types';
-import { Search, Filter, Mic, Plus, Download, CheckCircle, Trash2, XCircle } from 'lucide-react';
+import { Search, Mic, Plus, Download, CheckCircle, Trash2, XCircle, Package, Sparkles } from 'lucide-react';
 import { exportPantryPDF } from '../services/pdf';
 
 interface PantryScreenProps {
   inventory: InventoryItem[];
   onNavigate: (screen: ScreenType) => void;
-  onRescueItem: (id: string) => void;
+  onRescueItem: (id: string) => void; // Internally logs used_before_expiry
   onWasteItem: (id: string) => void;
   onDeleteItem: (id: string) => void;
   onVoiceAdd?: (spokenText: string) => void;
@@ -57,29 +57,24 @@ export const PantryScreen: React.FC<PantryScreenProps> = ({
         if (onVoiceAdd) {
           onVoiceAdd(transcript);
         } else {
-          alert(`Spoken Item Detected: "${transcript}". Navigating to Add Item form.`);
           onNavigate('add-item');
         }
       };
 
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
-      recognition.onend = () => {
-        setIsListening(false);
-      };
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
     } catch (e) {
       setIsListening(false);
     }
   };
 
   return (
-    <div className="space-y-4 pb-24 animate-fade-in">
+    <div className="space-y-4 pb-24 animate-fade-in max-w-md mx-auto">
       {/* Top Header & Actions */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">📦 Pantry</h1>
-          <p className="text-xs text-slate-500">{inventory.length} total items in household inventory</p>
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">📦 Pantry Inventory</h1>
+          <p className="text-xs text-slate-500">{inventory.length} total items logged</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -116,7 +111,6 @@ export const PantryScreen: React.FC<PantryScreenProps> = ({
           />
         </div>
 
-        {/* Voice Input Button */}
         <button
           onClick={handleVoiceInput}
           className={`p-2.5 rounded-xl border ${
@@ -124,7 +118,7 @@ export const PantryScreen: React.FC<PantryScreenProps> = ({
               ? 'bg-red-500 text-white animate-bounce border-red-500'
               : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
           }`}
-          title="Voice Command (Web Speech API)"
+          title="Voice Command"
         >
           <Mic className="w-5 h-5" />
         </button>
@@ -149,15 +143,21 @@ export const PantryScreen: React.FC<PantryScreenProps> = ({
 
       {/* Item List */}
       <div className="space-y-2.5">
-        {filteredItems.length === 0 ? (
-          <div className="text-center py-12 glass-panel rounded-3xl">
-            <p className="text-sm font-semibold text-slate-500">No items match your filter.</p>
+        {inventory.length === 0 ? (
+          <div className="text-center py-12 glass-panel rounded-3xl space-y-3">
+            <Package className="w-12 h-12 text-slate-300 mx-auto" />
+            <p className="font-bold text-sm text-slate-700 dark:text-slate-300">Your pantry is currently empty</p>
+            <p className="text-xs text-slate-500">Scan a receipt or add items manually to start tracking.</p>
             <button
               onClick={() => onNavigate('add-item')}
-              className="mt-3 text-xs text-haven-600 font-bold hover:underline"
+              className="mt-2 py-2 px-4 rounded-xl bg-haven-600 text-white font-bold text-xs shadow-sm"
             >
-              + Add a new item
+              + Add First Item
             </button>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="text-center py-10 glass-panel rounded-3xl text-xs text-slate-500">
+            No items match your search filter.
           </div>
         ) : (
           filteredItems.map((item) => {
@@ -175,9 +175,18 @@ export const PantryScreen: React.FC<PantryScreenProps> = ({
                     {isExpired ? '🔴' : isExpToday ? '🔴' : isUseSoon ? '🟡' : '🟢'}
                   </span>
                   <div>
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-white">{item.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm text-slate-900 dark:text-white">{item.name}</h3>
+                      {item.isEstimatedExpiry && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium flex items-center gap-0.5">
+                          <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                          <span>Estimated</span>
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-slate-500">
                       {item.quantity} {item.unit} • {item.storageLocation} • {item.category}
+                      {item.price ? ` • ₹${item.price}` : ''}
                     </div>
                   </div>
                 </div>
@@ -210,11 +219,13 @@ export const PantryScreen: React.FC<PantryScreenProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => onRescueItem(item.id)}
-                      title="Mark as Used (Rescued)"
-                      className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50"
+                      title="Mark as Used Before Expiry"
+                      className="py-1 px-2 rounded-lg text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 font-semibold text-[11px] flex items-center gap-1"
                     >
-                      <CheckCircle className="w-4 h-4" />
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Mark Used</span>
                     </button>
+
                     <button
                       onClick={() => onWasteItem(item.id)}
                       title="Mark Wasted"

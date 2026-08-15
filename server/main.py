@@ -70,20 +70,37 @@ def api_estimate_days(name: str, category: str = "Other"):
     days = estimate_expiry_days(name, category)
     return {"name": name, "category": category, "estimated_days": days}
 
-class ScanRequestModel(BaseModel):
-    scan_type: Optional[str] = "receipt"
-
 @app.post("/api/scan/extract")
-def api_scan_extract(req: ScanRequestModel):
+async def api_scan_extract(
+    scan_type: str = Form("receipt"),
+    file: Optional[UploadFile] = File(None)
+):
     """
     Processes receipt or product scan image into structured JSON items.
+    Accepts multipart image/file upload for future OCR vision integration.
     """
-    detected = simulate_scan_extraction(req.scan_type or "receipt")
+    raw_ocr_text = ""
+    if file:
+        try:
+            content = await file.read()
+            raw_ocr_text = content.decode("utf-8", errors="ignore")
+            if len(raw_ocr_text.strip()) > 10:
+                extracted = extract_items_from_receipt_text(raw_ocr_text)
+                return {
+                    "success": True,
+                    "scan_type": scan_type,
+                    "detected_items": extracted,
+                    "method": "file_ocr_parser"
+                }
+        except Exception:
+            pass
+
+    detected = simulate_scan_extraction(scan_type or "receipt")
     return {
         "success": True,
-        "scan_type": req.scan_type,
+        "scan_type": scan_type,
         "detected_items": detected,
-        "method": "ai_vision_model"
+        "method": "simulated_ocr_dev_mode"
     }
 
 @app.post("/api/recipes/suggest")

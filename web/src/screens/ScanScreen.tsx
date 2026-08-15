@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ScreenType, ExtractedScanItem } from '../types';
-import { FileText, Package, QrCode, Layers, Camera, Upload, Sparkles, Loader2 } from 'lucide-react';
+import { FileText, Package, QrCode, Layers, Camera, Upload, Sparkles, Loader2, Info } from 'lucide-react';
+import { api } from '../services/api';
 
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -12,87 +13,37 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({ onNavigate, onScanComple
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
-  const handleScanAction = async (scanType: string) => {
+  const handleScanAction = async (file?: File) => {
     setIsProcessing(true);
     try {
-      // Call Python FastAPI Vision API endpoint
-      const response = await fetch('http://localhost:8000/api/scan/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scan_type: scanType })
-      });
-      const data = await response.json();
-      
+      const result = await api.extractScanItems(scanMode, file);
       setIsProcessing(false);
-      if (data.detected_items && data.detected_items.length > 0) {
-        onScanComplete(data.detected_items);
+      if (result.detected_items && result.detected_items.length > 0) {
+        onScanComplete(result.detected_items);
         onNavigate('scan-review');
       }
     } catch (err) {
-      // High fidelity fallback simulation matching specs
       setIsProcessing(false);
-      const fallbackItems: ExtractedScanItem[] = [
-        {
-          name: 'Amul T-Special Milk',
-          category: 'Dairy',
-          quantity: 2,
-          unit: 'L',
-          purchaseDate: new Date().toISOString().split('T')[0],
-          expiryDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-          confidence: 0.96,
-          storageLocation: 'Fridge'
-        },
-        {
-          name: 'Whole Wheat Bread',
-          category: 'Bakery',
-          quantity: 1,
-          unit: 'pack',
-          purchaseDate: new Date().toISOString().split('T')[0],
-          expiryDate: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0],
-          confidence: 0.94,
-          storageLocation: 'Pantry'
-        },
-        {
-          name: 'Fresh Hybrid Tomatoes',
-          category: 'Vegetables',
-          quantity: 1,
-          unit: 'kg',
-          purchaseDate: new Date().toISOString().split('T')[0],
-          expiryDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-          confidence: 0.91,
-          storageLocation: 'Pantry'
-        },
-        {
-          name: 'Amul Masti Dahi Curd',
-          category: 'Dairy',
-          quantity: 500,
-          unit: 'g',
-          purchaseDate: new Date().toISOString().split('T')[0],
-          expiryDate: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0],
-          confidence: 0.93,
-          storageLocation: 'Fridge'
-        },
-        {
-          name: 'Fresh Baby Spinach',
-          category: 'Vegetables',
-          quantity: 1,
-          unit: 'pack',
-          purchaseDate: new Date().toISOString().split('T')[0],
-          expiryDate: new Date(Date.now() + 86400000 * 1).toISOString().split('T')[0],
-          confidence: 0.88,
-          storageLocation: 'Fridge'
-        }
-      ];
-      onScanComplete(fallbackItems);
-      onNavigate('scan-review');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleScanAction(e.target.files[0]);
     }
   };
 
   return (
     <div className="space-y-5 pb-24 animate-fade-in max-w-md mx-auto">
       <div>
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">📸 Haven Vision Scan</h1>
-        <p className="text-xs text-slate-500">Scan receipts or groceries to auto-update your inventory</p>
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white">📸 Haven Scan</h1>
+        <p className="text-xs text-slate-500">Scan receipts or groceries to extract items for review</p>
+      </div>
+
+      {/* Development Mode Notice */}
+      <div className="p-3 rounded-2xl bg-haven-50 dark:bg-haven-950/40 border border-haven-200 dark:border-haven-800 text-xs text-haven-900 dark:text-haven-100 flex items-center gap-2">
+        <Info className="w-4 h-4 text-haven-600 shrink-0" />
+        <span><span className="font-bold">Simulated OCR (Development Mode):</span> The API receives your image/file upload and extracts candidate items for human verification.</span>
       </div>
 
       {/* Mode Selector Tabs */}
@@ -148,7 +99,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({ onNavigate, onScanComple
 
       {/* Main Camera Viewfinder Box */}
       <div
-        className={`relative border-2 border-dashed rounded-3xl p-8 text-center flex flex-col items-center justify-center min-h-[300px] transition-all ${
+        className={`relative border-2 border-dashed rounded-3xl p-8 text-center flex flex-col items-center justify-center min-h-[280px] transition-all ${
           dragOver ? 'border-haven-600 bg-haven-50/50' : 'border-slate-300 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50'
         }`}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -156,15 +107,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({ onNavigate, onScanComple
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
-          handleScanAction(scanMode);
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleScanAction(e.dataTransfer.files[0]);
+          }
         }}
       >
         {isProcessing ? (
           <div className="space-y-4">
             <Loader2 className="w-12 h-12 text-haven-600 animate-spin mx-auto" />
             <div>
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">Analyzing image with Haven OCR...</h3>
-              <p className="text-xs text-slate-500 mt-1">Extracting items, quantities, and shelf-life estimates</p>
+              <h3 className="font-bold text-base text-slate-900 dark:text-white">Extracting items from image...</h3>
+              <p className="text-xs text-slate-500 mt-1">Preparing candidate items for human review</p>
             </div>
           </div>
         ) : (
@@ -178,16 +131,16 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({ onNavigate, onScanComple
                 {scanMode === 'receipt' && 'Align Grocery Receipt'}
                 {scanMode === 'product' && 'Point Camera at Item Package'}
                 {scanMode === 'barcode' && 'Center Barcode in Viewfinder'}
-                {scanMode === 'multi' && 'Capture Multiple Household Purchases'}
+                {scanMode === 'multi' && 'Capture Multiple Purchases'}
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Drag & drop a photo or click below to process
+                Drag & drop a photo file or click upload below
               </p>
             </div>
 
             <div className="flex flex-col gap-2.5 w-full max-w-xs mx-auto pt-2">
               <button
-                onClick={() => handleScanAction(scanMode)}
+                onClick={() => handleScanAction()}
                 className="w-full py-3.5 rounded-2xl bg-haven-600 hover:bg-haven-700 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all"
               >
                 <Camera className="w-4 h-4" />
@@ -196,11 +149,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({ onNavigate, onScanComple
 
               <label className="w-full py-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50">
                 <Upload className="w-4 h-4" />
-                <span>Upload Receipt Photo</span>
+                <span>Upload Receipt Photo File</span>
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={() => handleScanAction(scanMode)}
+                  onChange={handleFileChange}
                   className="hidden"
                 />
               </label>
@@ -213,7 +166,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({ onNavigate, onScanComple
       <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2.5">
         <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
         <div>
-          <span className="font-bold">Haven Safety Guardrail:</span> All extracted items pass through a <span className="underline font-bold">Scan Review screen</span> before touch your inventory database so you can verify and correct details.
+          <span className="font-bold">Human Confirmation Guardrail:</span> Extracted items are passed to the <span className="underline font-bold">Scan Review screen</span> where you can edit quantities, dates, or names before committing to your database.
         </div>
       </div>
     </div>
